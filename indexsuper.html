@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Supervisor de Docks</title>
+  <style>
+    body { font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
+    h1 { text-align: center; background: #555; color: white; padding: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; padding: 20px; }
+    .dock-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid #ccc;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .dock-card h2 { margin: 0 0 10px; }
+    .status { font-size: 24px; font-weight: bold; margin: 10px 0; }
+    .label { font-weight: bold; }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBjX7qy9erTCkhsDGkwR8eoo7VaLLlQcqc",
+      authDomain: "esp32-docks-4b6ac.firebaseapp.com",
+      databaseURL: "https://esp32-docks-4b6ac-default-rtdb.firebaseio.com",
+      projectId: "esp32-docks-4b6ac",
+      storageBucket: "esp32-docks-4b6ac.appspot.com",
+      messagingSenderId: "1026856329487",
+      appId: "1:1026856329487:web:1527bcb87a35ce0d939e7a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const totalDocks = 12;
+
+    for (let i = 1; i <= totalDocks; i++) {
+      const dockId = `dock${i}`;
+      const container = document.createElement("div");
+      container.className = "dock-card";
+      container.innerHTML = `
+        <h2>${dockId.toUpperCase()}</h2>
+        <div class="status" id="${dockId}-estado">Cargando...</div>
+        <div><span class="label">Hora de llegada:</span> <span id="${dockId}-llegada">-</span></div>
+        <div><span class="label">Tiempo estacionado:</span> <span id="${dockId}-tiempo">-</span></div>
+      `;
+      document.getElementById("grid").appendChild(container);
+
+      const refDock = ref(db, `docks/${dockId}`);
+      onValue(refDock, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        document.getElementById(`${dockId}-estado`).textContent =
+          data.camionPresente ? "🚛 Camión presente" : "🟢 Libre";
+        document.getElementById(`${dockId}-llegada`).textContent = data.horaLlegada || "-";
+        document.getElementById(`${dockId}-tiempo`).textContent = data.tiempoEstacionado || "-";
+      });
+    }
+  </script>
+</head>
+<body>
+  <h1>Dashboard Supervisor - Estado en Tiempo Real</h1>
+  <div class="grid" id="grid"></div>
+</body>
+</html>
