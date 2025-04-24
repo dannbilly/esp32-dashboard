@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Estado de Docks</title>
+  <script type="module">
+    // Importar módulos desde Firebase CDN (para GitHub Pages)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+    // Tu configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA4xIyg7IjU0febx21OmOw3pacxRTjK8I0",
+      authDomain: "esp32-docks.firebaseapp.com",
+      databaseURL: "https://esp32-docks-default-rtdb.firebaseio.com",
+      projectId: "esp32-docks",
+      storageBucket: "esp32-docks.firebasestorage.app",
+      messagingSenderId: "146550289162",
+      appId: "1:146550289162:web:89494dc0ed2a5b55e180f3",
+      measurementId: "G-WS2EFM47TN"
+    };
+
+    // Inicializar Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    // Escuchar cambios en dock1
+    const dockRef = ref(database, 'docks/dock1');
+    onValue(dockRef, (snapshot) => {
+      const data = snapshot.val();
+      document.getElementById("estadoDock").innerHTML = `
+        <tr>
+          <td>Dock 1</td>
+          <td>${data.camionPresente ? "Sí" : "No"}</td>
+          <td>${data.horaLlegada}</td>
+          <td>${data.tiempoEstacionado}</td>
+        </tr>`;
+    });
+
+    // Escuchar historial
+    const historialRef = ref(database, 'docks/historial');
+    onValue(historialRef, (snapshot) => {
+      const historial = snapshot.val();
+      const tabla = document.getElementById("historial");
+      tabla.innerHTML = ""; // limpiar
+
+      for (const key in historial) {
+        const evento = historial[key];
+        tabla.innerHTML += `
+          <tr>
+            <td>${evento.dock}</td>
+            <td>${evento.camionPresente ? "Sí" : "No"}</td>
+            <td>${evento.horaLlegada}</td>
+            <td>${evento.tiempoEstacionado}</td>
+          </tr>`;
+      }
+    });
+  </script>
+</head>
+<body>
+  <h2>Estado Actual del Dock</h2>
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Dock</th>
+        <th>Camión Presente</th>
+        <th>Hora de Llegada</th>
+        <th>Tiempo Estacionado</th>
+      </tr>
+    </thead>
+    <tbody id="estadoDock"></tbody>
+  </table>
+
+  <h2>Historial</h2>
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Dock</th>
+        <th>Camión Presente</th>
+        <th>Hora de Llegada</th>
+        <th>Tiempo Estacionado</th>
+      </tr>
+    </thead>
+    <tbody id="historial"></tbody>
+  </table>
+</body>
+</html>
