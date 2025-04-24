@@ -1,86 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Estado de Docks</title>
+  <meta charset="UTF-8">
+  <title>Supervisor de Docks</title>
+  <style>
+    body { font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
+    h1 { text-align: center; background: #555; color: white; padding: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; padding: 20px; }
+    .dock-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid #ccc;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .dock-card h2 { margin: 0 0 10px; }
+    .status { font-size: 24px; font-weight: bold; margin: 10px 0; }
+    .label { font-weight: bold; }
+  </style>
   <script type="module">
-    // Importar módulos desde Firebase CDN (para GitHub Pages)
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-    // Tu configuración de Firebase
     const firebaseConfig = {
-      apiKey: "AIzaSyA4xIyg7IjU0febx21OmOw3pacxRTjK8I0",
-      authDomain: "esp32-docks.firebaseapp.com",
-      databaseURL: "https://esp32-docks-default-rtdb.firebaseio.com",
-      projectId: "esp32-docks",
-      storageBucket: "esp32-docks.firebasestorage.app",
-      messagingSenderId: "146550289162",
-      appId: "1:146550289162:web:89494dc0ed2a5b55e180f3",
-      measurementId: "G-WS2EFM47TN"
+      apiKey: "AIzaSyBjX7qy9erTCkhsDGkwR8eoo7VaLLlQcqc",
+      authDomain: "esp32-docks-4b6ac.firebaseapp.com",
+      databaseURL: "https://esp32-docks-4b6ac-default-rtdb.firebaseio.com",
+      projectId: "esp32-docks-4b6ac",
+      storageBucket: "esp32-docks-4b6ac.appspot.com",
+      messagingSenderId: "1026856329487",
+      appId: "1:1026856329487:web:1527bcb87a35ce0d939e7a"
     };
 
-    // Inicializar Firebase
     const app = initializeApp(firebaseConfig);
-    const database = getDatabase(app);
+    const db = getDatabase(app);
 
-    // Escuchar cambios en dock1
-    const dockRef = ref(database, 'docks/dock1');
-    onValue(dockRef, (snapshot) => {
-      const data = snapshot.val();
-      document.getElementById("estadoDock").innerHTML = `
-        <tr>
-          <td>Dock 1</td>
-          <td>${data.camionPresente ? "Sí" : "No"}</td>
-          <td>${data.horaLlegada}</td>
-          <td>${data.tiempoEstacionado}</td>
-        </tr>`;
-    });
+    const totalDocks = 12;
 
-    // Escuchar historial
-    const historialRef = ref(database, 'docks/historial');
-    onValue(historialRef, (snapshot) => {
-      const historial = snapshot.val();
-      const tabla = document.getElementById("historial");
-      tabla.innerHTML = ""; // limpiar
+    for (let i = 1; i <= totalDocks; i++) {
+      const dockId = `dock${i}`;
+      const container = document.createElement("div");
+      container.className = "dock-card";
+      container.innerHTML = `
+        <h2>${dockId.toUpperCase()}</h2>
+        <div class="status" id="${dockId}-estado">Cargando...</div>
+        <div><span class="label">Hora de llegada:</span> <span id="${dockId}-llegada">-</span></div>
+        <div><span class="label">Tiempo estacionado:</span> <span id="${dockId}-tiempo">-</span></div>
+      `;
+      document.getElementById("grid").appendChild(container);
 
-      for (const key in historial) {
-        const evento = historial[key];
-        tabla.innerHTML += `
-          <tr>
-            <td>${evento.dock}</td>
-            <td>${evento.camionPresente ? "Sí" : "No"}</td>
-            <td>${evento.horaLlegada}</td>
-            <td>${evento.tiempoEstacionado}</td>
-          </tr>`;
-      }
-    });
+      const refDock = ref(db, `docks/${dockId}`);
+      onValue(refDock, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        document.getElementById(`${dockId}-estado`).textContent =
+          data.camionPresente ? "🚛 Camión presente" : "🟢 Libre";
+        document.getElementById(`${dockId}-llegada`).textContent = data.horaLlegada || "-";
+        document.getElementById(`${dockId}-tiempo`).textContent = data.tiempoEstacionado || "-";
+      });
+    }
   </script>
 </head>
 <body>
-  <h2>Estado Actual del Dock</h2>
-  <table border="1">
-    <thead>
-      <tr>
-        <th>Dock</th>
-        <th>Camión Presente</th>
-        <th>Hora de Llegada</th>
-        <th>Tiempo Estacionado</th>
-      </tr>
-    </thead>
-    <tbody id="estadoDock"></tbody>
-  </table>
-
-  <h2>Historial</h2>
-  <table border="1">
-    <thead>
-      <tr>
-        <th>Dock</th>
-        <th>Camión Presente</th>
-        <th>Hora de Llegada</th>
-        <th>Tiempo Estacionado</th>
-      </tr>
-    </thead>
-    <tbody id="historial"></tbody>
-  </table>
+  <h1>Dashboard Supervisor - Estado en Tiempo Real</h1>
+  <div class="grid" id="grid"></div>
 </body>
 </html>
+
