@@ -1,148 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Monitoreo de Docks</title>
-  <style>
-     html, body {
-      height: 100%;
-      width: 100%;
-      margin: 0;
-      padding: 0;
-    }
+  <title>Estado de Docks</title>
+  <script type="module">
+    // Importar módulos desde Firebase CDN (para GitHub Pages)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-    body {
-      font-family: sans-serif;
-      background: url('fondo_arbol_optimo.jpg') no-repeat center center fixed;
-      background-size: cover;
-    }
-    h1 {
-      text-align: center;
-     
-      margin-bottom: 20px;
-    }
-    .controls {
-      text-align: center;
-      margin-bottom: 25px;
-    }
-    .controls button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin: 5px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-    }
-    .dock {
-      background: white;
-      border: 3px solid #ccc;
-      border-radius: 12px;
-      padding: 15px;
-      text-align: center;
-      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-      transition: all 0.3s ease;
-    }
-    .dock h2 {
-      margin-top: 0;
-    }
-    .estado {
-      font-size: 18px;
-      margin: 10px 0;
-    }
-    .dock button {
-      padding: 6px 12px;
-      margin-top: 5px;
-      font-size: 14px;
-    }
-  </style>
+    // Tu configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA4xIyg7IjU0febx21OmOw3pacxRTjK8I0",
+      authDomain: "esp32-docks.firebaseapp.com",
+      databaseURL: "https://esp32-docks-default-rtdb.firebaseio.com",
+      projectId: "esp32-docks",
+      storageBucket: "esp32-docks.firebasestorage.app",
+      messagingSenderId: "146550289162",
+      appId: "1:146550289162:web:89494dc0ed2a5b55e180f3",
+      measurementId: "G-WS2EFM47TN"
+    };
+
+    // Inicializar Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    // Escuchar cambios en dock1
+    const dockRef = ref(database, 'docks/dock1');
+    onValue(dockRef, (snapshot) => {
+      const data = snapshot.val();
+      document.getElementById("estadoDock").innerHTML = `
+        <tr>
+          <td>Dock 1</td>
+          <td>${data.camionPresente ? "Sí" : "No"}</td>
+          <td>${data.horaLlegada}</td>
+          <td>${data.tiempoEstacionado}</td>
+        </tr>`;
+    });
+
+    // Escuchar historial
+    const historialRef = ref(database, 'docks/historial');
+    onValue(historialRef, (snapshot) => {
+      const historial = snapshot.val();
+      const tabla = document.getElementById("historial");
+      tabla.innerHTML = ""; // limpiar
+
+      for (const key in historial) {
+        const evento = historial[key];
+        tabla.innerHTML += `
+          <tr>
+            <td>${evento.dock}</td>
+            <td>${evento.camionPresente ? "Sí" : "No"}</td>
+            <td>${evento.horaLlegada}</td>
+            <td>${evento.tiempoEstacionado}</td>
+          </tr>`;
+      }
+    });
+  </script>
 </head>
 <body>
-  <h1>📦 KMMG DOCK</h1>
+  <h2>Estado Actual del Dock</h2>
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Dock</th>
+        <th>Camión Presente</th>
+        <th>Hora de Llegada</th>
+        <th>Tiempo Estacionado</th>
+      </tr>
+    </thead>
+    <tbody id="estadoDock"></tbody>
+  </table>
 
-  <div class="controls">
-    <button onclick="descargarTodos()">📥 Descargar TODOS</button>
-  </div>
-
-  <div class="grid" id="contenedorDocks"></div>
-
-  <script>
-    const docks = [
-      { id: 1, ip: "192.168.1.112" },
-      { id: 2, ip: "192.168.1.119" },
-      { id: 3, ip: "192.168.1.147" },
-      { id: 4, ip: "192.168.1.148" },
-      { id: 5, ip: "192.168.1.149" },
-      { id: 6, ip: "192.168.1.150" },
-      { id: 7, ip: "192.168.1.151" },
-      { id: 8, ip: "192.168.1.152" },
-      { id: 9, ip: "192.168.1.153" },
-      { id:10, ip: "192.168.1.121" },
-      { id:11, ip: "192.168.1.120" },
-      { id:12, ip: "192.168.1.113" },
-      { id:13, ip: "192.168.1.145" }
-    ];
-
-    function crearTarjetas() {
-      const contenedor = document.getElementById("contenedorDocks");
-      contenedor.innerHTML = "";
-      docks.forEach(dock => {
-        const div = document.createElement("div");
-        div.className = "dock";
-        div.id = `dock-${dock.id}`;
-        div.innerHTML = `
-          <h2>Dock ${dock.id}</h2>
-          <div class="estado">🔄 Cargando...</div>
-          <button onclick="descargarCSV('${dock.ip}')">📥 Descargar Excell</button>
-        `;
-        contenedor.appendChild(div);
-      });
-    }
-
-    function actualizarEstado() {
-      docks.forEach(dock => {
-        const card = document.getElementById(`dock-${dock.id}`);
-        const estadoDiv = card.querySelector(".estado");
-
-        fetch(`http://${dock.ip}/status`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.presente) {
-              estadoDiv.textContent = `🚛 Tiempo en puerta: ${data.tiempo}`;
-              card.style.backgroundColor = "#ffe5e5";  // rojo claro
-              card.style.borderColor = "red";
-            } else {
-              if (data.ultimo) {
-                estadoDiv.textContent = `🟢 Libre`;
-              } else {
-                estadoDiv.textContent = `🟢 Libre`;
-              }
-              card.style.backgroundColor = "#e5ffe5";  // verde claro
-              card.style.borderColor = "green";
-            }
-          })
-          .catch(() => {
-            estadoDiv.textContent = `❌ Sin conexión`;
-            card.style.backgroundColor = "#eeeeee";  // gris
-            card.style.borderColor = "#999";
-          });
-      });
-    }
-
-    function descargarCSV(ip) {
-      window.open(`http://${ip}/descargar`, '_blank');
-    }
-
-    function descargarTodos() {
-      docks.forEach(dock => {
-        window.open(`http://${dock.ip}/descargar`, '_blank');
-      });
-    }
-
-    crearTarjetas();
-    actualizarEstado();
-    setInterval(actualizarEstado, 2000);
-  </script>
+  <h2>Historial</h2>
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Dock</th>
+        <th>Camión Presente</th>
+        <th>Hora de Llegada</th>
+        <th>Tiempo Estacionado</th>
+      </tr>
+    </thead>
+    <tbody id="historial"></tbody>
+  </table>
 </body>
 </html>
