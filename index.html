@@ -55,11 +55,12 @@
     .status    { font-size: 20px; margin: 10px 0; font-weight: bold; }
     .label     { font-weight: bold; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <h1>Dock Monitoring Dashboard</h1>
   <div class="controls">
-    <button onclick="downloadCSV()">Download All Logs (CSV)</button>
+    <button onclick="downloadExcel()">Download All Logs (Excel)</button>
   </div>
   <div class="grid" id="grid"></div>
 
@@ -113,9 +114,9 @@
           arrivalEl.textContent = data.horaLlegada || "-";
           durationEl.textContent = data.tiempoEstacionado || "-";
 
-          if (min < 1/3) {
+          if (min < 20) {
             cardEl.className = "dock-card green";
-          } else if (min < 30) {
+          } else if (min < 1800) {
             cardEl.className = "dock-card yellow";
           } else {
             cardEl.className = "dock-card red";
@@ -129,7 +130,7 @@
       });
     }
 
-    window.downloadCSV = async function () {
+    window.downloadExcel = async function () {
       const logsRef = ref(db, 'historial');
       const snapshot = await get(logsRef);
       if (!snapshot.exists()) {
@@ -137,53 +138,50 @@
         return;
       }
 
-      console.log("🚚 EVENTOS RECIBIDOS:", snapshot.val());
-
       function tiempoAMinSeg(tiempoStr) {
         if (!tiempoStr) return 0;
         const [min, seg] = tiempoStr.split(":").map(Number);
         return min * 60 + seg;
       }
 
-      let csv = "Dock,Arrival Time,Duration\n";
+      const dataLogs = [];
       const resumen = {};
 
       snapshot.forEach(dockSnap => {
         const dock = dockSnap.key;
         const eventos = Object.values(dockSnap.val());
         eventos.forEach(ev => {
-          console.log("📋 Evaluando evento:", ev);
           const segundos = tiempoAMinSeg(ev.tiempoEstacionado);
           if (segundos > 20) {
-            csv += `${dock},${ev.horaLlegada},${ev.tiempoEstacionado}\n`;
+            dataLogs.push({ Dock: dock, "Arrival Time": ev.horaLlegada, Duration: ev.tiempoEstacionado });
             if (!resumen[dock]) resumen[dock] = [];
             resumen[dock].push(ev.tiempoEstacionado);
           }
         });
       });
 
-      csv += "\n\nSummary Table\n";
-      csv += "Dock," + Object.keys(resumen).join(",") + "\n";
-      const maxLen = Math.max(...Object.values(resumen).map(arr => arr.length));
-      for (let i = 0; i < maxLen; i++) {
-        let row = `Row ${i+1}`;
-        for (let dock of Object.keys(resumen)) {
-          row += "," + (resumen[dock][i] || "");
-        }
-        csv += row + "\n";
+      const summaryTable = [];
+      const headers = Object.keys(resumen);
+      summaryTable.push(["Tiempo estacionado", ...headers]);
+
+      const maxRows = Math.max(...headers.map(h => resumen[h].length));
+      for (let i = 0; i < maxRows; i++) {
+        const row = ["Row " + (i + 1)];
+        headers.forEach(h => {
+          row.push(resumen[h][i] || "");
+        });
+        summaryTable.push(row);
       }
 
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = "dock_logs.csv";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    }
+      const wb = XLSX.utils.book_new();
+      const ws1 = XLSX.utils.json_to_sheet(dataLogs);
+      const ws2 = XLSX.utils.aoa_to_sheet(summaryTable);
+      XLSX.utils.book_append_sheet(wb, ws1, "Logs");
+      XLSX.utils.book_append_sheet(wb, ws2, "Summary");
+      XLSX.writeFile(wb, "dock_logs.xlsx");
+    };
   </script>
 </body>
 </html>
+
 
