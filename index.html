@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>KIA Dock Monitoring </title>
+  <title>Dock Monitoring Dashboard</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -65,7 +65,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getDatabase, ref, onValue, get, child } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+    import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
     const app = initializeApp({
       apiKey: "AIzaSyBjX7qy9erTCkhsDGkwR8eoo7VaLLlQcqc",
@@ -129,21 +129,33 @@
       });
     }
 
-    window.downloadCSV = async function() {
+    window.downloadCSV = async function () {
       const logsRef = ref(db, 'historial');
       const snapshot = await get(logsRef);
-      if (!snapshot.exists()) return alert("No data to export");
+      if (!snapshot.exists()) {
+        alert("No data to export");
+        return;
+      }
+
+      function tiempoAMinSeg(tiempoStr) {
+        if (!tiempoStr) return 0;
+        const [min, seg] = tiempoStr.split(":").map(Number);
+        return min * 60 + seg;
+      }
 
       let csv = "Dock,Arrival Time,Duration\n";
-      const resumen = {}; // Para la tabla resumen
+      const resumen = {};
 
       snapshot.forEach(dockSnap => {
         const dock = dockSnap.key;
-        const eventos = dockSnap.val();
+        const eventos = Object.values(dockSnap.val());
         eventos.forEach(ev => {
-          csv += `${dock},${ev.horaLlegada},${ev.tiempoEstacionado}\n`;
-          if (!resumen[dock]) resumen[dock] = [];
-          resumen[dock].push(ev.tiempoEstacionado);
+          const segundos = tiempoAMinSeg(ev.tiempoEstacionado);
+          if (segundos > 20) {
+            csv += `${dock},${ev.horaLlegada},${ev.tiempoEstacionado}\n`;
+            if (!resumen[dock]) resumen[dock] = [];
+            resumen[dock].push(ev.tiempoEstacionado);
+          }
         });
       });
 
@@ -163,10 +175,13 @@
       const a = document.createElement('a');
       a.href = url;
       a.download = "dock_logs.csv";
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       URL.revokeObjectURL(url);
     }
   </script>
 </body>
 </html>
+
 
