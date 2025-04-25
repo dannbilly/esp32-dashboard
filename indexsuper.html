@@ -1,32 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard Docks</title>
+  <title>KIA Dock Monitoring </title>
   <style>
-    body { font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
-    h1 { text-align: center; background: #333; color: white; padding: 20px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; padding: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: linear-gradient(to bottom right, #e8f5e9, #f1f8e9);
+    }
+    h1 {
+      text-align: center;
+      background-color: #2e7d32;
+      color: white;
+      margin: 0;
+      padding: 20px 0;
+      font-size: 28px;
+    }
+    .controls {
+      text-align: center;
+      margin: 20px;
+    }
+    .controls button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+    .controls button:hover {
+      background-color: #1b5e20;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
     .dock-card {
-      border-radius: 10px;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       padding: 20px;
       text-align: center;
       border: 4px solid transparent;
-      background-color: white;
-      transition: background-color 0.5s, border 0.5s;
+      transition: all 0.3s ease;
     }
-    .verde     { background-color: #d4fcd4; border-color: #28a745; }  /* Libre */
-    .amarillo  { background-color: #fff9cc; border-color: #ffc107; }  /* <30 min */
-    .rojo      { background-color: #fddcdc; border-color: #dc3545; }  /* >=30 min */
-
-    .status { font-size: 24px; font-weight: bold; margin: 10px 0; }
-    .label { font-weight: bold; }
+    .green     { background-color: #d4fcd4; border-color: #2e7d32; }
+    .yellow    { background-color: #fff9c4; border-color: #fbc02d; }
+    .red       { background-color: #ffcdd2; border-color: #c62828; }
+    .status    { font-size: 20px; margin: 10px 0; font-weight: bold; }
+    .label     { font-weight: bold; }
   </style>
+</head>
+<body>
+  <h1>Dock Monitoring Dashboard</h1>
+  <div class="controls">
+    <button onclick="downloadCSV()">Download All Logs (CSV)</button>
+  </div>
+  <div class="grid" id="grid"></div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+    import { getDatabase, ref, onValue, get, child } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-    const firebaseConfig = {
+    const app = initializeApp({
       apiKey: "AIzaSyBjX7qy9erTCkhsDGkwR8eoo7VaLLlQcqc",
       authDomain: "esp32-docks-4b6ac.firebaseapp.com",
       databaseURL: "https://esp32-docks-4b6ac-default-rtdb.firebaseio.com",
@@ -34,68 +75,97 @@
       storageBucket: "esp32-docks-4b6ac.appspot.com",
       messagingSenderId: "1026856329487",
       appId: "1:1026856329487:web:1527bcb87a35ce0d939e7a"
-    };
+    });
 
-    const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-
     const totalDocks = 13;
 
-    function parseMin(tiempoStr) {
-      if (!tiempoStr || tiempoStr === "-") return 0;
-      const partes = tiempoStr.split(":");
-      const minutos = parseInt(partes[0]) || 0;
-      return minutos;
+    function toMinutes(timeStr) {
+      if (!timeStr || timeStr === "-") return 0;
+      const parts = timeStr.split(":");
+      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
     }
 
     for (let i = 1; i <= totalDocks; i++) {
       const dockId = `dock${i}`;
-      const container = document.createElement("div");
-      container.className = "dock-card verde";  // default verde
-      container.id = `${dockId}-card`;
-      container.innerHTML = `
+      const card = document.createElement("div");
+      card.className = "dock-card green";
+      card.id = `${dockId}-card`;
+      card.innerHTML = `
         <h2>${dockId.toUpperCase()}</h2>
-        <div class="status" id="${dockId}-estado">Cargando...</div>
-        <div><span class="label">Hora de llegada:</span> <span id="${dockId}-llegada">-</span></div>
-        <div><span class="label">Tiempo estacionado:</span> <span id="${dockId}-tiempo">-</span></div>
+        <div class="status" id="${dockId}-status">Loading...</div>
+        <div><span class="label">Arrival Time:</span> <span id="${dockId}-arrival">-</span></div>
+        <div><span class="label">Time Parked:</span> <span id="${dockId}-duration">-</span></div>
       `;
-      document.getElementById("grid").appendChild(container);
+      document.getElementById("grid").appendChild(card);
 
-      const refDock = ref(db, `docks/${dockId}`);
-      onValue(refDock, (snapshot) => {
+      const dockRef = ref(db, `docks/${dockId}`);
+      onValue(dockRef, snapshot => {
         const data = snapshot.val();
-        if (!data) return;
-
-        const estadoEl = document.getElementById(`${dockId}-estado`);
-        const llegadaEl = document.getElementById(`${dockId}-llegada`);
-        const tiempoEl = document.getElementById(`${dockId}-tiempo`);
+        const statusEl = document.getElementById(`${dockId}-status`);
+        const arrivalEl = document.getElementById(`${dockId}-arrival`);
+        const durationEl = document.getElementById(`${dockId}-duration`);
         const cardEl = document.getElementById(`${dockId}-card`);
 
-        const tiempo = data.tiempoEstacionado || "-";
-        const minutos = parseMin(tiempo);
+        const min = toMinutes(data?.tiempoEstacionado);
+        if (data?.camionPresente) {
+          statusEl.textContent = "🚛 Truck Present";
+          arrivalEl.textContent = data.horaLlegada || "-";
+          durationEl.textContent = data.tiempoEstacionado || "-";
 
-        if (data.camionPresente) {
-          estadoEl.textContent = "🚛 Camión presente";
-          llegadaEl.textContent = data.horaLlegada || "-";
-          tiempoEl.textContent = tiempo;
-
-          if (minutos < 30) {
-            cardEl.className = "dock-card amarillo";
+          if (min < 1/3) {
+            cardEl.className = "dock-card green";
+          } else if (min < 30) {
+            cardEl.className = "dock-card yellow";
           } else {
-            cardEl.className = "dock-card rojo";
+            cardEl.className = "dock-card red";
           }
         } else {
-          estadoEl.textContent = "🟢 Libre";
-          llegadaEl.textContent = "-";
-          tiempoEl.textContent = "-";
-          cardEl.className = "dock-card verde";
+          statusEl.textContent = "🟢 Available";
+          arrivalEl.textContent = "-";
+          durationEl.textContent = "-";
+          cardEl.className = "dock-card green";
         }
       });
     }
+
+    window.downloadCSV = async function() {
+      const logsRef = ref(db, 'historial');
+      const snapshot = await get(logsRef);
+      if (!snapshot.exists()) return alert("No data to export");
+
+      let csv = "Dock,Arrival Time,Duration\n";
+      const resumen = {}; // Para la tabla resumen
+
+      snapshot.forEach(dockSnap => {
+        const dock = dockSnap.key;
+        const eventos = dockSnap.val();
+        eventos.forEach(ev => {
+          csv += `${dock},${ev.horaLlegada},${ev.tiempoEstacionado}\n`;
+          if (!resumen[dock]) resumen[dock] = [];
+          resumen[dock].push(ev.tiempoEstacionado);
+        });
+      });
+
+      csv += "\n\nSummary Table\n";
+      csv += "Dock," + Object.keys(resumen).join(",") + "\n";
+      const maxLen = Math.max(...Object.values(resumen).map(arr => arr.length));
+      for (let i = 0; i < maxLen; i++) {
+        let row = `Row ${i+1}`;
+        for (let dock of Object.keys(resumen)) {
+          row += "," + (resumen[dock][i] || "");
+        }
+        csv += row + "\n";
+      }
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "dock_logs.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   </script>
-</head>
-<body>
-  <h1>Supervisor de Docks – Estado en Tiempo Real</h1>
-  <div class="grid" id="grid"></div>
 </body>
 </html>
