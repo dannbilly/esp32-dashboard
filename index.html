@@ -109,14 +109,14 @@
         const cardEl = document.getElementById(`${dockId}-card`);
 
         const min = toMinutes(data?.tiempoEstacionado);
-        if (data?.camionPresente) {
+        if (data?.camionPresente && data?.tiempoEstacionado !== "00:00") {
           statusEl.textContent = "🚛 Truck Present";
           arrivalEl.textContent = data.horaLlegada || "-";
           durationEl.textContent = data.tiempoEstacionado || "-";
 
-          if (min < 20) {
+          if (min < 1/3) {
             cardEl.className = "dock-card green";
-          } else if (min < 1800) {
+          } else if (min < 30) {
             cardEl.className = "dock-card yellow";
           } else {
             cardEl.className = "dock-card red";
