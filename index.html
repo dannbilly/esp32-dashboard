@@ -137,6 +137,8 @@
         return;
       }
 
+      console.log("🚚 EVENTOS RECIBIDOS:", snapshot.val());
+
       function tiempoAMinSeg(tiempoStr) {
         if (!tiempoStr) return 0;
         const [min, seg] = tiempoStr.split(":").map(Number);
@@ -150,6 +152,7 @@
         const dock = dockSnap.key;
         const eventos = Object.values(dockSnap.val());
         eventos.forEach(ev => {
+          console.log("📋 Evaluando evento:", ev);
           const segundos = tiempoAMinSeg(ev.tiempoEstacionado);
           if (segundos > 20) {
             csv += `${dock},${ev.horaLlegada},${ev.tiempoEstacionado}\n`;
@@ -183,5 +186,4 @@
   </script>
 </body>
 </html>
-
 
